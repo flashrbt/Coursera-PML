@@ -1,0 +1,264 @@
+---
+title: 'Peer-graded Assignment: Prediction Assignment '
+author: "Chengquan Li"
+date: "01/23/2016"
+output:
+  html_document: default
+  keep_md: yes
+  pdf_document: default
+  word_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,cache = TRUE,fig.width=4, fig.height=3,warning = FALSE)
+```
+
+### Background
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement – a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset).
+
+###Data
+
+The training data for this project are available here:
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+
+The test data are available here:
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+
+## Load data
+
+First we should check the availability of data files. If those two data files were saved in local folder, we will read them into memory, otherwise we need get the data from website.
+
+```{r warning=FALSE,}
+trainingfile<-"pml-training.csv"
+testingfile<-"pml-testing.csv"
+
+if(!(file.exists(trainingfile)))
+  {
+        download.file("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv",
+                      trainingfile, method = "curl")
+        data_training<-read.csv(trainingfile)
+        write.csv(data_training,trainingfile)
+  } else
+  {
+          data_training<-read.csv(trainingfile)
+  }
+
+if(!(file.exists(testingfile)))
+  {
+        download.file("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv",
+                      tesingfile, method = "curl")
+        data_testing<-read.csv(testingfile)
+        write.csv(data_testing,testingfile)
+  } else
+  {
+          data_testing<-read.csv(testingfile)
+  }
+
+
+# here we set the seed for reproducible analysis.
+set.seed(12345)
+
+```
+
+## Cleaning Data
+
+
+At first, let's check the size of data set data_training:
+
+``` {r echo="TRUE"}
+str(data_training, list.len = 20)
+```
+
+The training dataset has 160 variables with 19622 observations (rows). We also noticed that there are some "NA" values in cols of this dataset. For the training and prediction, we don't want to deal with those NA data. But first let's check what's the ratio of NA data in those cols. We define a function to check "NA" ratio
+
+```{r echo=TRUE}
+
+NARatio<-function(colname){ 
+        NAsum<-sum(is.na(data_training[,colname]))/19622
+        return(NAsum)
+        }
+
+ 
+data_NARatio<-sapply(colnames(data_training),NARatio)       
+
+levels(as.factor(data_NARatio))
+
+```
+We can see that the NA value ratio is either 0 (no NA valuse) or a lot (97% are NA values). Since NA value ratio is very high, we can just remove those cols from taining data. 
+
+
+
+
+### Remove NA cols
+
+
+```{r}
+
+# Here we define function NAcol to check if the NA value number is greater than 0. 
+
+NAcol<-function(colname){ 
+        if(sum(is.na(data_training[,colname]))>0) {return(T)}
+        else { return(F)}
+}
+NAcols<-sapply(colnames(data_training),NAcol)
+new_data_training <- data_training[, !NAcols]
+#new_data_testing<-data_testing[,!NAcols]
+
+str(new_data_training,list.len = 20)
+
+```
+We also notice that there are cols of timestamps, which we will not use for training. And the first column is just the index, we will remove it too.
+
+### Remove timestamps cols
+
+
+```{r}
+timestampcols<-grep("timestamp",colnames(new_data_training))
+
+new_data_training<-new_data_training[,-c(1,timestampcols)]
+#new_data_testing<-new_data_testing[,-c(1,timestampcols)]
+
+#dim(new_data_testing)
+
+dim(new_data_training)
+```
+
+### Remove nearly zero covariates
+
+We need check if there is any variable which has no variability at all using the function "nearZeroVar"
+
+```{r}
+library(caret)
+
+nZV<-nearZeroVar(new_data_training)
+
+new_data_training2<-new_data_training[,-nZV]
+
+#new_data_testing2<-new_data_testing[,-nZV]
+
+#dim(new_data_testing2);dim(new_data_training2)
+
+str(new_data_training2,list.len = 20)
+```
+After removing those near zero covariates, we can see that the col numbers reduced down to 55 from 89. We also see that those cols starting with "#DIV/0!" were removed too. We will use "new_data_training2" and "new_data_testing2" for next model training, testing and predicting.
+
+```{r}
+
+final_train<-new_data_training2
+final_predict<-data_testing  #here we use the original testing data for predicting
+
+final_train$classe<-as.factor(final_train$classe)
+
+```
+## Model training and  testing
+
+I found out that with so many rows (19622 observations), train() function in caret package with "rf" or "gbm" method would take too long time for training. Instead, we will use function "randomForest()" and "C5.0()" to do the training and predicting later.
+
+
+### Model training
+
+As usual, we split the data into training and tesing dataset using createDataPartition() with p=0.75. We have 75% data for training and 25% for model testing.
+
+```{r}
+inTrain<-createDataPartition(y=final_train$classe,p=0.75,list=FALSE)
+
+final_training_data<-final_train[inTrain,]
+
+final_testing_data<-final_train[-inTrain,]
+```
+
+Insead of calling train() function in caret, we will directly use randomForest(), which is much faster. And we will use C5.0 instead of GBM in our data training process. 
+
+In randomForest() function, tree number ntree will set to 50, 100 and 500. We can see that the accuracy between ntree=50 and 500 are very close. 
+
+
+```{r}
+
+
+library(optimbase)
+
+library(randomForest)
+library(C50)
+
+start <- proc.time()
+
+rf50.fit<-randomForest(classe~.,data=final_training_data,ntree=50)
+print(proc.time() - start)
+
+start <- proc.time()
+
+rf200.fit<-randomForest(classe~.,data=final_training_data,ntree=200)
+print(proc.time() - start)
+
+
+rf500.fit<-randomForest(classe~.,data=final_training_data,ntree=500)
+print(proc.time() - start)
+
+
+start <- proc.time()
+c50.fit<-C5.0(classe~.,data=final_training_data,rule=TRUE)
+print(proc.time() - start)
+
+```
+We can see that speed of randomForest() and C5.0() are really fast, from 5 seconds to 90 seconds with different tree numbers.
+
+
+
+### Model testing
+
+```{r}
+
+tested.c50<-predict(c50.fit,newdata=final_testing_data)
+print(cmc50<-confusionMatrix(tested.c50,final_testing_data$classe))
+
+
+tested.rf50<-predict(rf50.fit, newdata = final_testing_data)
+print(cmrf50<-confusionMatrix(tested.rf50,final_testing_data$classe))
+
+
+tested.rf200<-predict(rf200.fit, newdata = final_testing_data)
+print(cmrf200<-confusionMatrix(tested.rf200,final_testing_data$classe))
+
+
+tested.rf500<-predict(rf500.fit, newdata = final_testing_data)
+print(cmrf500<-confusionMatrix(tested.rf500,final_testing_data$classe))
+
+```
+Here the accuray of C5.0 is `r cmc50$overall[1]`, for randomForest() are `r cmrf50$overall[1]`, `r cmrf200$overall[1]`, `r cmrf500$overall[1]` with tree number=50, 200, and 500, respectively. Those number are almost same because we have enough data set for training (75% of 19662 rows)
+
+
+## Predict data
+
+Finally we can predict the output of our testing data using our training models
+
+ 
+```{r}
+
+finalpredict.rf50<-as.matrix(predict(rf50.fit,newdata=final_predict))
+finalpredict.rf200<-as.matrix(predict(rf200.fit,newdata=final_predict))
+finalpredict.rf500<-as.matrix(predict(rf500.fit,newdata=final_predict))
+finalpredict.c50<-as.matrix(predict(c50.fit,final_predict))
+
+finalpredict<-cbind(finalpredict.c50,finalpredict.rf50,finalpredict.rf200,finalpredict.rf500)
+colnames(finalpredict)<-c("C50","rf 50","rf 200","rf 500")
+
+
+
+finalpredict<-transpose(finalpredict)
+
+print(finalpredict)
+
+```
+The results of these 4 training models are same. 
+
+
+## Session information
+Following are R and operation system information I used to generate this analysis
+```{r sessioninfo, echo=FALSE}
+sessionInfo()
+```
+

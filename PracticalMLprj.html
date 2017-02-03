@@ -215,7 +215,7 @@ NAcol&lt;-function(colname){
 }
 NAcols&lt;-sapply(colnames(data_training),NAcol)
 new_data_training &lt;- data_training[, !NAcols]
-#new_data_testing&lt;-data_testing[,!NAcols]
+new_data_testing&lt;-data_testing[,!NAcols]
 
 str(new_data_training,list.len = 20)</code></pre>
 <pre><code>## 'data.frame':    19622 obs. of  93 variables:
@@ -247,7 +247,7 @@ str(new_data_training,list.len = 20)</code></pre>
 <pre class="r"><code>timestampcols&lt;-grep(&quot;timestamp&quot;,colnames(new_data_training))
 
 new_data_training&lt;-new_data_training[,-c(1,timestampcols)]
-#new_data_testing&lt;-new_data_testing[,-c(1,timestampcols)]
+new_data_testing&lt;-new_data_testing[,-c(1,timestampcols)]
 
 #dim(new_data_testing)
 
@@ -257,13 +257,14 @@ dim(new_data_training)</code></pre>
 <div id="remove-nearly-zero-covariates" class="section level3">
 <h3>Remove nearly zero covariates</h3>
 <p>We need check if there is any variable which has no variability at all using the function “nearZeroVar”</p>
-<pre class="r"><code>library(caret)
-
-nZV&lt;-nearZeroVar(new_data_training)
+<pre class="r"><code>library(caret)</code></pre>
+<pre><code>## Loading required package: lattice</code></pre>
+<pre><code>## Loading required package: ggplot2</code></pre>
+<pre class="r"><code>nZV&lt;-nearZeroVar(new_data_training)
 
 new_data_training2&lt;-new_data_training[,-nZV]
 
-#new_data_testing2&lt;-new_data_testing[,-nZV]
+new_data_testing2&lt;-new_data_testing[,-nZV]
 
 #dim(new_data_testing2);dim(new_data_training2)
 
@@ -292,7 +293,7 @@ str(new_data_training2,list.len = 20)</code></pre>
 ##   [list output truncated]</code></pre>
 <p>After removing those near zero covariates, we can see that the col numbers reduced down to 55 from 89. We also see that those cols starting with “#DIV/0!” were removed too. We will use “new_data_training2” and “new_data_testing2” for next model training, testing and predicting.</p>
 <pre class="r"><code>final_train&lt;-new_data_training2
-final_predict&lt;-data_testing  #here we use the original testing data for predicting
+final_predict&lt;-new_data_testing2  
 
 final_train$classe&lt;-as.factor(final_train$classe)</code></pre>
 </div>
@@ -310,32 +311,39 @@ final_training_data&lt;-final_train[inTrain,]
 final_testing_data&lt;-final_train[-inTrain,]</code></pre>
 <p>Insead of calling train() function in caret, we will directly use randomForest(), which is much faster. And we will use C5.0 instead of GBM in our data training process.</p>
 <p>In randomForest() function, tree number ntree will set to 50, 100 and 500. We can see that the accuracy between ntree=50 and 500 are very close.</p>
-<pre class="r"><code>library(optimbase)
-
-library(randomForest)
-library(C50)
+<pre class="r"><code>library(optimbase)</code></pre>
+<pre><code>## Loading required package: Matrix</code></pre>
+<pre class="r"><code>library(randomForest)</code></pre>
+<pre><code>## randomForest 4.6-12</code></pre>
+<pre><code>## Type rfNews() to see new features/changes/bug fixes.</code></pre>
+<pre><code>## 
+## Attaching package: 'randomForest'</code></pre>
+<pre><code>## The following object is masked from 'package:ggplot2':
+## 
+##     margin</code></pre>
+<pre class="r"><code>library(C50)
 
 start &lt;- proc.time()
 
 rf50.fit&lt;-randomForest(classe~.,data=final_training_data,ntree=50)
 print(proc.time() - start)</code></pre>
 <pre><code>##    user  system elapsed 
-##   7.460   0.115   7.607</code></pre>
+##   6.670   0.066   6.744</code></pre>
 <pre class="r"><code>start &lt;- proc.time()
 
 rf200.fit&lt;-randomForest(classe~.,data=final_training_data,ntree=200)
 print(proc.time() - start)</code></pre>
 <pre><code>##    user  system elapsed 
-##  27.030   0.539  28.050</code></pre>
+##  25.811   0.456  26.416</code></pre>
 <pre class="r"><code>rf500.fit&lt;-randomForest(classe~.,data=final_training_data,ntree=500)
 print(proc.time() - start)</code></pre>
 <pre><code>##    user  system elapsed 
-##  92.012   2.629  96.742</code></pre>
+##  89.648   2.379  92.828</code></pre>
 <pre class="r"><code>start &lt;- proc.time()
 c50.fit&lt;-C5.0(classe~.,data=final_training_data,rule=TRUE)
 print(proc.time() - start)</code></pre>
 <pre><code>##    user  system elapsed 
-##   5.383   0.236   5.924</code></pre>
+##   4.957   0.162   5.231</code></pre>
 <p>We can see that speed of randomForest() and C5.0() are really fast, from 5 seconds to 90 seconds with different tree numbers.</p>
 </div>
 <div id="model-testing" class="section level3">
@@ -346,33 +354,33 @@ print(cmc50&lt;-confusionMatrix(tested.c50,final_testing_data$classe))</code></p
 ## 
 ##           Reference
 ## Prediction    A    B    C    D    E
-##          A 1388    3    0    0    0
-##          B    1  934    4    2    4
-##          C    6   12  847    4    6
-##          D    0    0    4  796    3
-##          E    0    0    0    2  888
+##          A 1395    4    0    0    0
+##          B    0  928   12    1    3
+##          C    0   16  842    7    0
+##          D    0    1    1  794    1
+##          E    0    0    0    2  897
 ## 
 ## Overall Statistics
-##                                           
-##                Accuracy : 0.9896          
-##                  95% CI : (0.9863, 0.9922)
-##     No Information Rate : 0.2845          
-##     P-Value [Acc &gt; NIR] : &lt; 2.2e-16       
-##                                           
-##                   Kappa : 0.9868          
-##  Mcnemar's Test P-Value : NA              
+##                                          
+##                Accuracy : 0.9902         
+##                  95% CI : (0.987, 0.9928)
+##     No Information Rate : 0.2845         
+##     P-Value [Acc &gt; NIR] : &lt; 2.2e-16      
+##                                          
+##                   Kappa : 0.9876         
+##  Mcnemar's Test P-Value : NA             
 ## 
 ## Statistics by Class:
 ## 
 ##                      Class: A Class: B Class: C Class: D Class: E
-## Sensitivity            0.9950   0.9842   0.9906   0.9900   0.9856
-## Specificity            0.9991   0.9972   0.9931   0.9983   0.9995
-## Pos Pred Value         0.9978   0.9884   0.9680   0.9913   0.9978
-## Neg Pred Value         0.9980   0.9962   0.9980   0.9980   0.9968
+## Sensitivity            1.0000   0.9779   0.9848   0.9876   0.9956
+## Specificity            0.9989   0.9960   0.9943   0.9993   0.9995
+## Pos Pred Value         0.9971   0.9831   0.9734   0.9962   0.9978
+## Neg Pred Value         1.0000   0.9947   0.9968   0.9976   0.9990
 ## Prevalence             0.2845   0.1935   0.1743   0.1639   0.1837
-## Detection Rate         0.2830   0.1905   0.1727   0.1623   0.1811
-## Detection Prevalence   0.2836   0.1927   0.1784   0.1637   0.1815
-## Balanced Accuracy      0.9971   0.9907   0.9919   0.9942   0.9925</code></pre>
+## Detection Rate         0.2845   0.1892   0.1717   0.1619   0.1829
+## Detection Prevalence   0.2853   0.1925   0.1764   0.1625   0.1833
+## Balanced Accuracy      0.9994   0.9869   0.9896   0.9934   0.9975</code></pre>
 <pre class="r"><code>tested.rf50&lt;-predict(rf50.fit, newdata = final_testing_data)
 print(cmrf50&lt;-confusionMatrix(tested.rf50,final_testing_data$classe))</code></pre>
 <pre><code>## Confusion Matrix and Statistics
@@ -380,99 +388,99 @@ print(cmrf50&lt;-confusionMatrix(tested.rf50,final_testing_data$classe))</code><
 ##           Reference
 ## Prediction    A    B    C    D    E
 ##          A 1395    3    0    0    0
-##          B    0  944    0    0    0
-##          C    0    2  855    3    0
-##          D    0    0    0  800    3
-##          E    0    0    0    1  898
+##          B    0  942    1    0    0
+##          C    0    4  854    1    0
+##          D    0    0    0  803    1
+##          E    0    0    0    0  900
 ## 
 ## Overall Statistics
-##                                           
-##                Accuracy : 0.9976          
-##                  95% CI : (0.9957, 0.9987)
-##     No Information Rate : 0.2845          
-##     P-Value [Acc &gt; NIR] : &lt; 2.2e-16       
-##                                           
-##                   Kappa : 0.9969          
-##  Mcnemar's Test P-Value : NA              
+##                                          
+##                Accuracy : 0.998          
+##                  95% CI : (0.9963, 0.999)
+##     No Information Rate : 0.2845         
+##     P-Value [Acc &gt; NIR] : &lt; 2.2e-16      
+##                                          
+##                   Kappa : 0.9974         
+##  Mcnemar's Test P-Value : NA             
 ## 
 ## Statistics by Class:
 ## 
 ##                      Class: A Class: B Class: C Class: D Class: E
-## Sensitivity            1.0000   0.9947   1.0000   0.9950   0.9967
-## Specificity            0.9991   1.0000   0.9988   0.9993   0.9998
-## Pos Pred Value         0.9979   1.0000   0.9942   0.9963   0.9989
-## Neg Pred Value         1.0000   0.9987   1.0000   0.9990   0.9993
+## Sensitivity            1.0000   0.9926   0.9988   0.9988   0.9989
+## Specificity            0.9991   0.9997   0.9988   0.9998   1.0000
+## Pos Pred Value         0.9979   0.9989   0.9942   0.9988   1.0000
+## Neg Pred Value         1.0000   0.9982   0.9998   0.9998   0.9998
 ## Prevalence             0.2845   0.1935   0.1743   0.1639   0.1837
-## Detection Rate         0.2845   0.1925   0.1743   0.1631   0.1831
-## Detection Prevalence   0.2851   0.1925   0.1754   0.1637   0.1833
-## Balanced Accuracy      0.9996   0.9974   0.9994   0.9971   0.9982</code></pre>
+## Detection Rate         0.2845   0.1921   0.1741   0.1637   0.1835
+## Detection Prevalence   0.2851   0.1923   0.1752   0.1639   0.1835
+## Balanced Accuracy      0.9996   0.9962   0.9988   0.9993   0.9994</code></pre>
 <pre class="r"><code>tested.rf200&lt;-predict(rf200.fit, newdata = final_testing_data)
 print(cmrf200&lt;-confusionMatrix(tested.rf200,final_testing_data$classe))</code></pre>
 <pre><code>## Confusion Matrix and Statistics
 ## 
 ##           Reference
 ## Prediction    A    B    C    D    E
-##          A 1395    1    0    0    0
-##          B    0  946    0    0    0
-##          C    0    2  855    6    0
-##          D    0    0    0  797    4
-##          E    0    0    0    1  897
+##          A 1395    4    0    0    0
+##          B    0  942    0    0    0
+##          C    0    3  855    0    0
+##          D    0    0    0  804    0
+##          E    0    0    0    0  901
 ## 
 ## Overall Statistics
 ##                                           
-##                Accuracy : 0.9971          
-##                  95% CI : (0.9952, 0.9984)
+##                Accuracy : 0.9986          
+##                  95% CI : (0.9971, 0.9994)
 ##     No Information Rate : 0.2845          
 ##     P-Value [Acc &gt; NIR] : &lt; 2.2e-16       
 ##                                           
-##                   Kappa : 0.9964          
+##                   Kappa : 0.9982          
 ##  Mcnemar's Test P-Value : NA              
 ## 
 ## Statistics by Class:
 ## 
 ##                      Class: A Class: B Class: C Class: D Class: E
-## Sensitivity            1.0000   0.9968   1.0000   0.9913   0.9956
-## Specificity            0.9997   1.0000   0.9980   0.9990   0.9998
-## Pos Pred Value         0.9993   1.0000   0.9907   0.9950   0.9989
-## Neg Pred Value         1.0000   0.9992   1.0000   0.9983   0.9990
+## Sensitivity            1.0000   0.9926   1.0000   1.0000   1.0000
+## Specificity            0.9989   1.0000   0.9993   1.0000   1.0000
+## Pos Pred Value         0.9971   1.0000   0.9965   1.0000   1.0000
+## Neg Pred Value         1.0000   0.9982   1.0000   1.0000   1.0000
 ## Prevalence             0.2845   0.1935   0.1743   0.1639   0.1837
-## Detection Rate         0.2845   0.1929   0.1743   0.1625   0.1829
-## Detection Prevalence   0.2847   0.1929   0.1760   0.1633   0.1831
-## Balanced Accuracy      0.9999   0.9984   0.9990   0.9952   0.9977</code></pre>
+## Detection Rate         0.2845   0.1921   0.1743   0.1639   0.1837
+## Detection Prevalence   0.2853   0.1921   0.1750   0.1639   0.1837
+## Balanced Accuracy      0.9994   0.9963   0.9996   1.0000   1.0000</code></pre>
 <pre class="r"><code>tested.rf500&lt;-predict(rf500.fit, newdata = final_testing_data)
 print(cmrf500&lt;-confusionMatrix(tested.rf500,final_testing_data$classe))</code></pre>
 <pre><code>## Confusion Matrix and Statistics
 ## 
 ##           Reference
 ## Prediction    A    B    C    D    E
-##          A 1395    3    0    0    0
-##          B    0  944    0    0    0
-##          C    0    2  855    5    0
-##          D    0    0    0  798    4
-##          E    0    0    0    1  897
+##          A 1395    4    0    0    0
+##          B    0  941    1    0    0
+##          C    0    4  854    1    0
+##          D    0    0    0  803    0
+##          E    0    0    0    0  901
 ## 
 ## Overall Statistics
 ##                                          
-##                Accuracy : 0.9969         
-##                  95% CI : (0.995, 0.9983)
+##                Accuracy : 0.998          
+##                  95% CI : (0.9963, 0.999)
 ##     No Information Rate : 0.2845         
 ##     P-Value [Acc &gt; NIR] : &lt; 2.2e-16      
 ##                                          
-##                   Kappa : 0.9961         
+##                   Kappa : 0.9974         
 ##  Mcnemar's Test P-Value : NA             
 ## 
 ## Statistics by Class:
 ## 
 ##                      Class: A Class: B Class: C Class: D Class: E
-## Sensitivity            1.0000   0.9947   1.0000   0.9925   0.9956
-## Specificity            0.9991   1.0000   0.9983   0.9990   0.9998
-## Pos Pred Value         0.9979   1.0000   0.9919   0.9950   0.9989
-## Neg Pred Value         1.0000   0.9987   1.0000   0.9985   0.9990
+## Sensitivity            1.0000   0.9916   0.9988   0.9988   1.0000
+## Specificity            0.9989   0.9997   0.9988   1.0000   1.0000
+## Pos Pred Value         0.9971   0.9989   0.9942   1.0000   1.0000
+## Neg Pred Value         1.0000   0.9980   0.9998   0.9998   1.0000
 ## Prevalence             0.2845   0.1935   0.1743   0.1639   0.1837
-## Detection Rate         0.2845   0.1925   0.1743   0.1627   0.1829
-## Detection Prevalence   0.2851   0.1925   0.1758   0.1635   0.1831
-## Balanced Accuracy      0.9996   0.9974   0.9991   0.9958   0.9977</code></pre>
-<p>Here the accuray of C5.0 is 0.9896003, for randomForest() are 0.997553, 0.9971452, 0.9969413 with tree number=50, 200, and 500, respectively. Those number are almost same because we have enough data set for training (75% of 19662 rows)</p>
+## Detection Rate         0.2845   0.1919   0.1741   0.1637   0.1837
+## Detection Prevalence   0.2853   0.1921   0.1752   0.1637   0.1837
+## Balanced Accuracy      0.9994   0.9957   0.9988   0.9994   1.0000</code></pre>
+<p>Here the accuray of C5.0 is 0.9902121, for randomForest() are 0.9979608, 0.9985726, 0.9979608 with tree number=50, 200, and 500, respectively. Those number are almost same because we have enough data set for training (75% of 19662 rows)</p>
 </div>
 </div>
 <div id="predict-data" class="section level2">
@@ -492,7 +500,7 @@ finalpredict&lt;-transpose(finalpredict)
 
 print(finalpredict)</code></pre>
 <pre><code>##        1   2   3   4   5   6   7   8   9   10  11  12  13  14  15  16  17 
-## C50    &quot;B&quot; &quot;A&quot; &quot;B&quot; &quot;A&quot; &quot;A&quot; &quot;E&quot; &quot;D&quot; &quot;B&quot; &quot;A&quot; &quot;A&quot; &quot;B&quot; &quot;C&quot; &quot;B&quot; &quot;A&quot; &quot;E&quot; &quot;E&quot; &quot;A&quot;
+## C50    &quot;B&quot; &quot;A&quot; &quot;B&quot; &quot;A&quot; &quot;A&quot; &quot;E&quot; &quot;D&quot; &quot;C&quot; &quot;A&quot; &quot;A&quot; &quot;B&quot; &quot;C&quot; &quot;B&quot; &quot;A&quot; &quot;E&quot; &quot;E&quot; &quot;A&quot;
 ## rf 50  &quot;B&quot; &quot;A&quot; &quot;B&quot; &quot;A&quot; &quot;A&quot; &quot;E&quot; &quot;D&quot; &quot;B&quot; &quot;A&quot; &quot;A&quot; &quot;B&quot; &quot;C&quot; &quot;B&quot; &quot;A&quot; &quot;E&quot; &quot;E&quot; &quot;A&quot;
 ## rf 200 &quot;B&quot; &quot;A&quot; &quot;B&quot; &quot;A&quot; &quot;A&quot; &quot;E&quot; &quot;D&quot; &quot;B&quot; &quot;A&quot; &quot;A&quot; &quot;B&quot; &quot;C&quot; &quot;B&quot; &quot;A&quot; &quot;E&quot; &quot;E&quot; &quot;A&quot;
 ## rf 500 &quot;B&quot; &quot;A&quot; &quot;B&quot; &quot;A&quot; &quot;A&quot; &quot;E&quot; &quot;D&quot; &quot;B&quot; &quot;A&quot; &quot;A&quot; &quot;B&quot; &quot;C&quot; &quot;B&quot; &quot;A&quot; &quot;E&quot; &quot;E&quot; &quot;A&quot;
@@ -501,7 +509,7 @@ print(finalpredict)</code></pre>
 ## rf 50  &quot;B&quot; &quot;B&quot; &quot;B&quot;
 ## rf 200 &quot;B&quot; &quot;B&quot; &quot;B&quot;
 ## rf 500 &quot;B&quot; &quot;B&quot; &quot;B&quot;</code></pre>
-<p>The results of these 4 training models are same.</p>
+<p>The results of these 4 training models are almost same. We will use the predict result of randomForest as the final result.</p>
 </div>
 <div id="session-information" class="section level2">
 <h2>Session information</h2>

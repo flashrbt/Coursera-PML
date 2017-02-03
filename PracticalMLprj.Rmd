@@ -3,9 +3,9 @@ title: 'Peer-graded Assignment: Prediction Assignment '
 author: "Chengquan Li"
 date: "01/23/2016"
 output:
-  html_document: default
-  keep_md: yes
   pdf_document: default
+  keep_md: yes
+  html_document: default
   word_document: default
 ---
 
@@ -106,7 +106,7 @@ NAcol<-function(colname){
 }
 NAcols<-sapply(colnames(data_training),NAcol)
 new_data_training <- data_training[, !NAcols]
-#new_data_testing<-data_testing[,!NAcols]
+new_data_testing<-data_testing[,!NAcols]
 
 str(new_data_training,list.len = 20)
 
@@ -120,7 +120,7 @@ We also notice that there are cols of timestamps, which we will not use for trai
 timestampcols<-grep("timestamp",colnames(new_data_training))
 
 new_data_training<-new_data_training[,-c(1,timestampcols)]
-#new_data_testing<-new_data_testing[,-c(1,timestampcols)]
+new_data_testing<-new_data_testing[,-c(1,timestampcols)]
 
 #dim(new_data_testing)
 
@@ -138,7 +138,7 @@ nZV<-nearZeroVar(new_data_training)
 
 new_data_training2<-new_data_training[,-nZV]
 
-#new_data_testing2<-new_data_testing[,-nZV]
+new_data_testing2<-new_data_testing[,-nZV]
 
 #dim(new_data_testing2);dim(new_data_training2)
 
@@ -149,7 +149,7 @@ After removing those near zero covariates, we can see that the col numbers reduc
 ```{r}
 
 final_train<-new_data_training2
-final_predict<-data_testing  #here we use the original testing data for predicting
+final_predict<-new_data_testing2  
 
 final_train$classe<-as.factor(final_train$classe)
 
@@ -253,7 +253,7 @@ finalpredict<-transpose(finalpredict)
 print(finalpredict)
 
 ```
-The results of these 4 training models are same. 
+The results of these 4 training models are almost same. We will use the predict result of randomForest as the final result. 
 
 
 ## Session information
